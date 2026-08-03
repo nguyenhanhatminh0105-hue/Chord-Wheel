@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Interactive chord wheel with MediaPipe hand tracking",
   "main": "main.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "SET ELECTRON_RUN_AS_NODE= && electron ."
   },
