@@ -21,3 +21,5 @@ npm start
 ```
 
 Requires Node.js and a webcam (optional, for hand tracking).
+
+On Windows, `launch.vbs` (which calls `launch.bat`) offers a double-click, no-terminal way to start the app once the repo path inside `launch.bat` is updated to match your local checkout.
