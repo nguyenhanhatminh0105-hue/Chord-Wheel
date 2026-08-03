@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Interactive chord wheel with MediaPipe hand tracking",
   "main": "main.js",
+  "license": "MIT",
   "engines": {
     "node": ">=18"
   },
