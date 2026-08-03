@@ -8,7 +8,8 @@
     "node": ">=18"
   },
   "scripts": {
-    "start": "SET ELECTRON_RUN_AS_NODE= && electron ."
+    "start": "SET ELECTRON_RUN_AS_NODE= && electron .",
+    "test": "echo \"No tests specified yet\" && exit 0"
   },
   "dependencies": {
     "@mediapipe/camera_utils": "^0.3.1675466862",
