@@ -1,17 +1,8 @@
-# Dependencies
 node_modules/
-
-# Generated output
-graphify-out/
-
-# OS
+dist/
+build/
+.env
+.env.local
+*.log
 .DS_Store
 Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-
-# Logs
-*.log
-npm-debug.log*
