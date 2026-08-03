@@ -4,8 +4,7 @@
   "description": "Interactive chord wheel with MediaPipe hand tracking",
   "main": "main.js",
   "scripts": {
-    "start": "SET ELECTRON_RUN_AS_NODE= && electron .",
-    "install-deps": "npm install"
+    "start": "SET ELECTRON_RUN_AS_NODE= && electron ."
   },
   "dependencies": {
     "@mediapipe/camera_utils": "^0.3.1675466862",
