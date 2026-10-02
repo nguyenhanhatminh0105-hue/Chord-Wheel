@@ -13,7 +13,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      # The music-theory tests need no dependencies, so Electron is not installed here.
+      # onnxruntime-node is needed by the classifier test; the Electron binary and ONNX Runtime's
+      # CUDA libraries (downloaded by default on Linux x64) are not.
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+          ONNXRUNTIME_NODE_INSTALL: skip
       - run: npm test
 
   python:
