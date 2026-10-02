@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chord-Wheel gestures</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0f; --panel: #14141b; --line: #2a2a38; --text: #e2e8f0; --muted: #8b8b9a;
+    --orange: #f97316; --purple: #a78bfa;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Space Mono', ui-monospace, monospace; }
+  main { max-width: 1000px; margin: 0 auto; padding: 28px 16px 40px; }
+  h1 { font-size: 1.6rem; margin: 0 0 8px; color: var(--orange); }
+  .lead { margin: 0 0 18px; color: var(--muted); line-height: 1.6; max-width: 70ch; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+  .button {
+    font: inherit; font-size: 0.9rem; padding: 8px 14px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--line); background: #1e1e2e; color: var(--text);
+  }
+  .button:hover { border-color: var(--orange); }
+  .button.active { background: #f9731622; border-color: var(--orange); color: var(--orange); }
+  .button[aria-disabled="true"], .button:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
+  .stage { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 16px; align-items: start; }
+  @media (max-width: 760px) { .stage { grid-template-columns: 1fr; } }
+  canvas {
+    display: block; width: auto; height: auto; max-width: 100%; max-height: 72vh;
+    background: #0a0a10; border: 1px solid var(--line); border-radius: 8px;
+  }
+  #results { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; min-height: 140px; }
+  #status { margin: 0; color: var(--muted); font-size: 0.85rem; line-height: 1.5; }
+  .hand + .hand { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .hand h2 { margin: 0 0 8px; font-size: 0.85rem; font-weight: 700; }
+  .hand p { margin: 0; color: var(--muted); font-size: 0.85rem; }
+  .row { display: grid; grid-template-columns: 58px 1fr 46px; gap: 8px; align-items: center; margin: 5px 0; font-size: 0.85rem; }
+  .bar { height: 10px; background: #1e1e2e; border-radius: 5px; overflow: hidden; }
+  .bar span { display: block; height: 100%; border-radius: 5px; }
+  .pct { text-align: right; color: var(--muted); }
+  footer { margin-top: 24px; color: var(--muted); font-size: 0.8rem; line-height: 1.7; }
+  a { color: var(--purple); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Chord-Wheel gestures</h1>
+  <p class="lead">
+    Show one or two hands. MediaPipe finds 21 landmarks on each hand, and a network of 14,215 weights
+    names the pose: fist, palm, one, peace, three, four or other. These are the poses that play
+    <a href="https://github.com/nguyenhanhatminh0105-hue/Chord-Wheel">Chord-Wheel</a>.
+    Everything runs in your browser; no image leaves your computer.
+  </p>
+  <div class="controls">
+    <label class="button" id="upload-label" aria-disabled="true">Upload a photo
+      <input type="file" id="upload" accept="image/*" hidden disabled></label>
+    <button class="button" id="webcam-btn" disabled>Use the webcam</button>
+  </div>
+  <div class="stage">
+    <canvas id="view" width="960" height="540"></canvas>
+    <div id="results" aria-live="polite"><p id="status">Loading the hand tracker and the model…</p></div>
+  </div>
+  <footer>
+    The model was trained on hand landmarks from <a href="https://github.com/hukenovs/hagrid">HaGRID</a>
+    (CC BY-SA 4.0) and runs here with ONNX Runtime Web; hands are found by MediaPipe's Hand Landmarker.
+    The feature transform, classifier and smoother on this page are the same files the desktop app runs.
+    How it was built: <a href="https://github.com/nguyenhanhatminh0105-hue/Chord-Wheel/blob/main/docs/how-it-works.md">how it works</a>
+    · <a href="https://github.com/nguyenhanhatminh0105-hue/Chord-Wheel/blob/main/ml/MODEL_CARD.md">model card</a>
+  </footer>
+</main>
+<!-- The app's own gesture modules, each wrapped by build_space.py to set window.chordWheel.<name>.exports. -->
+<script src="features.js"></script>
+<script src="classifier.js"></script>
+<script src="smoother.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/ort.min.js"></script>
+<script type="module" src="demo.js"></script>
+</body>
+</html>

@@ -228,10 +228,13 @@ full model.
 - **`docs/how-it-works.md`:** the feature transform with a worked example,
   how the network and training work, ONNX export, the smoother, and why the
   split is by person (data leakage).
-- **Live demo:** a Hugging Face Space (Gradio) in `ml/space/`. A visitor
-  uploads a hand photo or takes a webcam snapshot; MediaPipe finds the
-  landmarks, the ONNX model classifies them, and the page shows the top
-  three poses with probabilities over the landmark overlay.
+- **Live demo:** a static Hugging Face Space assembled from `ml/space/` by
+  `ml/scripts/build_space.py`. A visitor uploads a hand photo or turns on
+  the webcam; in the browser, MediaPipe's Hand Landmarker finds the
+  landmarks, the app's own feature transform, classifier and smoother run
+  the ONNX model with ONNX Runtime Web, and the page shows the top three
+  poses with probabilities beside the landmark overlay. No image leaves the
+  visitor's computer.
 
 ## 11. Layout
 
@@ -244,7 +247,7 @@ ml/gesturenet/      hagrid.py  features.py  dataset.py  model.py  train.py
 ml/scripts/         download_hagrid.py
 ml/tests/           test_*.py  fixtures/
 ml/reports/         metrics.json  confusion_*.png
-ml/space/           app.py  requirements.txt  README.md
+ml/space/           index.html  demo.js  README.md
 test/               existing tests + gestures.*.test.js
 docs/               gesture-control-design.md  how-it-works.md
 ```
@@ -268,3 +271,7 @@ docs/               gesture-control-design.md  how-it-works.md
   proportions compared upright and sideways hands, and HaGRID has almost no
   sideways hands, so it failed. One factor for the whole dataset is exact for
   its portrait 3:4 images and approximate for the other one in four.
+- **A static demo Space.** A Gradio Space now needs a paid plan, or a free
+  account over 30 days old for ZeroGPU. The 66 KB model runs in the browser,
+  so a static Space works for any account, starts instantly, and keeps
+  visitors' photos on their own machines.
