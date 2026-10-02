@@ -11,6 +11,11 @@ document.getElementById('close-btn').addEventListener('click', () => {
 // Notes, scales and chord spelling live in theory.js (unit-tested under Node).
 const theory = require('./theory');
 const { QUALITIES, midiToFreq } = theory;
+// Gesture control (gestures/*.js, models/gestures.onnx).
+const gesturePath = require('path');
+const { GestureClassifier } = require('./gestures/classifier');
+const { GestureController } = require('./gestures/controller');
+const { Recorder, KEY_LABELS } = require('./gestures/recorder');
 
 // ── State ────────────────────────────────────────────────────────────────────
 let selectedNote = -1;      // 0-11, -1 = none
@@ -682,6 +687,7 @@ function onHandResults(results) {
   oCtx.clearRect(0, 0, W, H);
 
   let rawLeft = null, rawRight = null;
+  const detected = [];
 
   if (results.multiHandLandmarks) {
     for (let h = 0; h < results.multiHandLandmarks.length; h++) {
@@ -696,6 +702,7 @@ function onHandResults(results) {
 
       if (handedness === 'Right') rawLeft  = { x: px, y: py };
       else                         rawRight = { x: px, y: py };
+      detected.push({ role: handedness === 'Right' ? 'note' : 'quality', handedness, landmarks });
 
       // Draw finger landmarks (raw)
       for (const lm of landmarks) {
@@ -709,6 +716,10 @@ function onHandResults(results) {
       }
     }
   }
+
+  const imgW = videoEl.videoWidth || 1, imgH = videoEl.videoHeight || 1;
+  if (recorder.on) recorder.record(detected, imgW, imgH);
+  if (gesturesEnabled && gestureController) gestureController.observe(detected, imgW, imgH);
 
   // EMA smoothing + grace period — left hand (orange, note wheel)
   if (rawLeft) {
@@ -766,7 +777,22 @@ function onHandResults(results) {
     oCtx.restore();
   }
 
-  // Left hand controls note wheel
+  if (gesturesEnabled && gestureController) {
+    const { qualityHandled } = gestureController.control(smoothLeft, smoothRight);
+    if (!qualityHandled) positionalQualityControl();
+    drawGestureLabels();
+  } else {
+    positionalNoteControl();
+    positionalQualityControl();
+  }
+  if (recorder.on) drawRecordingBadge();
+
+  leftHandPos  = smoothLeft;
+  rightHandPos = smoothRight;
+}
+
+// Position-only control: whichever slice the palm is over (the behaviour with gestures off).
+function positionalNoteControl() {
   if (smoothLeft) {
     const ni = getNoteAtPoint(smoothLeft.x, smoothLeft.y);
     if (ni >= 0) {
@@ -782,8 +808,9 @@ function onHandResults(results) {
   } else {
     if (leftHandOnNote) { leftHandOnNote = false; onRelease(); }
   }
+}
 
-  // Right hand controls quality wheel
+function positionalQualityControl() {
   if (smoothRight) {
     const qi = getQualAtPoint(smoothRight.x, smoothRight.y);
     if (qi >= 0) {
@@ -799,9 +826,78 @@ function onHandResults(results) {
   } else {
     rightHandOnQual = false;
   }
+}
 
-  leftHandPos  = smoothLeft;
-  rightHandPos = smoothRight;
+// The app functions gesture control drives.
+const gestureUi = {
+  noteAtPoint: (x, y) => getNoteAtPoint(x, y),
+  // onNotePress toggles a note that is already sounding (for example one started with the mouse).
+  press: (note, x, y) => { if (!(isPlaying && selectedNote === note)) onNotePress(note, x, y); },
+  slide: (note, x, y) => onNoteSlide(note, x, y),
+  release: () => onRelease(),
+  setQuality: (name, x, y) => {
+    const qi = QUALITIES.indexOf(name);
+    if (qi >= 0 && qi !== selectedQuality) onQualPress(qi, x, y);
+  },
+};
+
+let gestureController = null;   // set once the model has loaded
+let gesturesEnabled = false;
+const recorder = new Recorder(gesturePath.join(__dirname, 'ml', 'data', 'recordings'));
+const gestureBtn = document.getElementById('gesture-btn');
+
+GestureClassifier.load(gesturePath.join(__dirname, 'models', 'gestures.onnx'),
+                       gesturePath.join(__dirname, 'models', 'labels.json'))
+  .then(classifier => {
+    gestureController = new GestureController({ classifier, classes: classifier.labels, ui: gestureUi });
+    gestureBtn.disabled = false;
+    window.__gesturesReady = true;   // lets scripts/e2e-gestures.js wait for the model
+  })
+  .catch(err => {
+    console.warn('Gesture model unavailable:', err && err.message);
+    gestureBtn.textContent = 'Gestures unavailable';
+    gestureBtn.disabled = true;
+  });
+
+gestureBtn.addEventListener('click', () => {
+  if (!gestureController) return;
+  gesturesEnabled = !gesturesEnabled;
+  gestureBtn.classList.toggle('active', gesturesEnabled);
+  leftHandOnNote = false;
+  rightHandOnQual = false;
+  if (!gesturesEnabled) gestureController.reset();
+});
+
+window.addEventListener('keydown', e => {
+  if (e.repeat) return;
+  if (e.key === 'r' || e.key === 'R') { recorder.toggle(); return; }
+  if (recorder.on && KEY_LABELS[e.key]) recorder.setLabel(KEY_LABELS[e.key]);
+});
+window.addEventListener('keyup', e => {
+  if (recorder.on && KEY_LABELS[e.key]) recorder.setLabel(null);
+});
+
+function drawGestureLabels() {
+  const labels = gestureController.labels();
+  const draw = (pos, label, color) => {
+    if (!pos || !label) return;
+    oCtx.save();
+    oCtx.font = '600 13px monospace';
+    oCtx.textAlign = 'center';
+    oCtx.fillStyle = color;
+    oCtx.fillText(`${label.pose} ${Math.round(label.confidence * 100)}%`, pos.x, pos.y - 22);
+    oCtx.restore();
+  };
+  draw(smoothLeft, labels.note, '#f97316');
+  draw(smoothRight, labels.quality, '#a78bfa');
+}
+
+function drawRecordingBadge() {
+  oCtx.save();
+  oCtx.font = '600 14px monospace';
+  oCtx.fillStyle = '#ef4444';
+  oCtx.fillText(`● REC ${recorder.label || '(hold 1-7)'}`, 16, 28);
+  oCtx.restore();
 }
 
 // ── Initial draw ──────────────────────────────────────────────────────────────
