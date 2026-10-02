@@ -24,7 +24,9 @@ def raised_fingers(points, width: float = 1.0, height: float = 1.0) -> frozenset
         return float(np.hypot(*(p[a] - p[b])))
 
     up = {name for name, (pip, tip) in FINGERS.items() if dist(tip, 0) > dist(pip, 0)}
-    if dist(4, 5) > dist(3, 5):        # thumb tip farther from the index knuckle than its IP joint
+    # A folded thumb crosses the palm toward the little finger, so its tip ends up nearer the little
+    # finger's knuckle than its IP joint is; a raised thumb points away from it.
+    if dist(4, 17) > dist(3, 17):
         up.add("thumb")
     return frozenset(up)
 

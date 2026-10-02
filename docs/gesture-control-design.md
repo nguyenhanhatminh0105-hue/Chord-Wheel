@@ -159,7 +159,8 @@ macro-F1, and a confusion matrix:
 2. **Webcam recordings**: the real-world number for this app and camera.
 3. **Rules baseline** on both sets, for comparison: a finger is "raised" when
    its tip is farther from the wrist than its middle joint (PIP); the thumb
-   when its tip is farther from the index knuckle than its IP joint. Raised
+   when its tip is farther from the little finger's knuckle than its IP
+   joint (a folded thumb crosses the palm toward the little finger). Raised
    fingers map to poses (none → `fist`, all five → `palm`, index only →
    `one`, index and middle → `peace`, index to ring → `three`, index to
    little → `four`, anything else → `other`).

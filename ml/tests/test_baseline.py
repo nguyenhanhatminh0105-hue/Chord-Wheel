@@ -28,6 +28,12 @@ def test_rotation_does_not_change_the_pose():
     assert classify((p - p[0]) @ rot.T + p[0]) == "peace"
 
 
+def test_a_thumb_folded_across_the_palm_is_down():
+    p = synthetic_hand(("index", "middle", "ring", "little"))
+    p[4] = np.array([0.5, 0.7]) + 0.1 * np.array([0.25, -0.55])   # tip over the ring finger's knuckle
+    assert classify(p) == "four"
+
+
 def test_unlisted_combination_is_other():
     assert classify(synthetic_hand(("thumb", "index"))) == "other"
 
