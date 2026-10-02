@@ -66,8 +66,10 @@ download); no images are downloaded. HaGRID is licensed under CC BY-SA 4.0
 with project-specific terms; it is credited in the model card, and neither
 the data nor any derived dataset is committed.
 
-Classes used: HaGRID's `fist`, `palm`, `one`, `peace`, `three`, `four`, and
-`no_gesture` (as `other`). HaGRID has several three-finger classes; the one
+Classes used: HaGRID's `fist`, `palm`, `one`, `peace`, `three`, `four`, and,
+as `other`, both `no_gesture` and four common out-of-vocabulary gestures
+(`like`, `ok`, `rock`, `call`), so a pose outside the vocabulary maps to
+`other` rather than to the nearest pose. HaGRID has several three-finger classes; the one
 whose raised fingers are index, middle and ring is used. Before training, the
 mean normalised pose of each chosen class is plotted to confirm its shape, and
 the annotation field names are read from the downloaded files rather than
@@ -171,9 +173,11 @@ The README shows a model-versus-rules table on both test sets.
 | `gestures/smoother.js` | Per-hand 5-frame majority vote and threshold (section 1). |
 | `gestures/actions.js` | Pure function: smoothed poses and palm positions to actions: play note *i*, release, set quality *q*. |
 | `gestures/recorder.js` | Recording mode; appends JSON lines. |
+| `gestures/controller.js` | Glue for the frame loop: features, classifier, smoother and actions, with the app's press, slide, release and set-quality functions passed in, so the whole path is testable without Electron. |
 
-`renderer.js` changes only in `onHandResults` (which calls these modules when
-gestures are on), plus the toggle button and the per-hand labels.
+`renderer.js` changes only in `onHandResults` (which calls the controller when
+gestures are on), plus the toggle button, the per-hand labels and the
+recording keys.
 
 ## 8. Errors and fallbacks
 
