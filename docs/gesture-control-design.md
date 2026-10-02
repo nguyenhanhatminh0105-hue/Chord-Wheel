@@ -96,11 +96,14 @@ Every hand becomes 42 numbers by the same procedure in Python
    and each `y` by the image height, so one unit means the same distance in
    both directions. (MediaPipe normalises `x` and `y` by different amounts on
    a non-square image.) HaGRID records no image sizes, so for HaGRID every
-   `x` is multiplied by one dataset-wide aspect factor, estimated before
-   training as the factor that makes a hand's wrist-to-knuckle length,
-   relative to its knuckle span, the same whether the hand is upright or
-   turned sideways. Training augmentation (section 4) covers the remaining
-   variation.
+   `x` is multiplied by one dataset-wide aspect factor: the most common
+   width / height among images sampled, before training, from HaGRID's
+   512-pixel release, which keeps each image's proportions (read through the
+   Hugging Face Dataset Viewer). The hands cannot give the factor themselves,
+   because nearly all of them are upright. About three images in four are
+   portrait 3:4; the stretch augmentation (section 4) spans the shapes of
+   most of the rest, and the webcam evaluation (section 6) checks the
+   result on correctly scaled hands.
 2. **Translate.** Subtract the wrist (landmark 0) from every point.
 3. **Rotate upright.** With `v` the middle-finger knuckle (landmark 9) and
    `s = |v|`, map every point `(x, y)` to
@@ -260,3 +263,7 @@ docs/               gesture-control-design.md  how-it-works.md
   split would leak them across sets and overstate accuracy.
 - **A rules baseline.** It shows whether learning was needed at all, and where
   it helps.
+- **HaGRID's aspect from its image sizes.** A first estimate from hand
+  proportions compared upright and sideways hands, and HaGRID has almost no
+  sideways hands, so it failed. One factor for the whole dataset is exact for
+  its portrait 3:4 images and approximate for the other one in four.

@@ -1,21 +1,21 @@
-"""Estimate HaGRID's aspect factor, pick its three-finger class, check the splits are person-disjoint.
+"""Measure HaGRID's aspect factor, pick its three-finger class, check the splits are person-disjoint.
     python ml/scripts/calibrate_hagrid.py ml/data/hagrid/annotations   -> gesturenet/hagrid_calibration.json
+Image sizes come from HaGRID's 512-pixel release through the Hugging Face Dataset Viewer (a few minutes).
 """
 import json
 import sys
 from pathlib import Path
 
-import numpy as np
-
-from gesturenet.calibration import estimate_aspect, three_fraction
-from gesturenet.hagrid import (BASE_MAPPING, CALIBRATION_FILE, SPLITS, THREE_CANDIDATES, Calibration,
-                               load_split, mapping, users_in_several_splits)
+from gesturenet.calibration import (SIZES_DATASET, SIZES_SPLITS, dominant_aspect, sample_image_sizes,
+                                    three_fraction, viewer_get)
+from gesturenet.hagrid import (CALIBRATION_FILE, SPLITS, THREE_CANDIDATES, Calibration, load_split,
+                               mapping, users_in_several_splits)
 
 
 def main(root: Path) -> None:
-    gestures_only = {k: v for k, v in BASE_MAPPING.items() if v != "other"}
-    points = np.stack([h.points for h in load_split(root, "train", gestures_only)])
-    aspect = estimate_aspect(points)
+    sizes = [size for split in SIZES_SPLITS for size in sample_image_sizes(viewer_get, split)]
+    aspect, share = dominant_aspect(sizes)
+    print(f"{len(sizes)} images sampled from {SIZES_DATASET}: width/height {aspect:.2f} in {share:.1%}")
     fractions = {name: three_fraction(root, name, aspect) for name in THREE_CANDIDATES}
     for name, frac in fractions.items():
         print(f"{name:7} index+middle+ring raised in {frac:6.1%} of its hands")
@@ -25,8 +25,8 @@ def main(root: Path) -> None:
     if shared:
         raise SystemExit(f"{len(shared)} people appear in more than one split")
     CALIBRATION_FILE.write_text(json.dumps(
-        {"aspect": aspect, "three_class": three, "hands_used_for_aspect": int(len(points))}, indent=2),
-        encoding="utf-8")
+        {"aspect": aspect, "three_class": three, "aspect_share": round(share, 3),
+         "images_sampled": len(sizes), "sizes_from": SIZES_DATASET}, indent=2) + "\n", encoding="utf-8")
     print(f"aspect {aspect:.2f}, three-finger class '{three}', splits person-disjoint -> {CALIBRATION_FILE}")
 
 
