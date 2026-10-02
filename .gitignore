@@ -6,3 +6,11 @@ build/
 *.log
 .DS_Store
 Thumbs.db
+
+# gesture model training
+ml/.venv/
+ml/data/
+ml/artifacts/
+__pycache__/
+*.egg-info/
+.pytest_cache/
