@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "SET ELECTRON_RUN_AS_NODE= && electron .",
-    "test": "node --test"
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "@mediapipe/camera_utils": "^0.3.1675466862",
