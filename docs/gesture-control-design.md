@@ -138,7 +138,7 @@ feature unchanged.
 
 ## 5. Export and runtime
 
-- **ONNX** (opset 17): input `landmarks`, float32 `[N, 42]`; output `probs`,
+- **ONNX** (opset 18, the minimum for PyTorch's current `torch.export`-based exporter): input `landmarks`, float32 `[N, 42]`; output `probs`,
   float32 `[N, 7]`; class names in `models/labels.json`. The export is
   checked against PyTorch on 1,000 test samples (max absolute difference
   below 1e-5).
