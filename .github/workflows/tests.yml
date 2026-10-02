@@ -6,12 +6,31 @@ on:
   pull_request:
 
 jobs:
-  unit:
+  node:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      # The music-theory tests need no dependencies, so Electron is not installed here.
+      # onnxruntime-node is needed by the classifier test; the Electron binary and ONNX Runtime's
+      # CUDA libraries (downloaded by default on Linux x64) are not.
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+          ONNXRUNTIME_NODE_INSTALL: skip
       - run: npm test
+
+  python:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - run: pip install -e ".[dev]"
+      - run: pytest -q

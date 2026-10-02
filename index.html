@@ -169,6 +169,7 @@
       pointer-events: none;
     }
   </style>
+<style>.toggle-btn:disabled { opacity: 0.4; cursor: default; }</style>
 </head>
 <body>
   <div id="titlebar">
@@ -237,6 +238,7 @@
     <button class="toggle-btn" id="snap-btn">Snap</button>
     <button class="toggle-btn active-purple" id="reverb-btn">Reverb</button>
     <button class="toggle-btn" id="cam-btn">📷 Cam</button>
+    <button class="toggle-btn" id="gesture-btn" disabled>✋ Gestures</button>
   </div>
   <script src="renderer.js"></script>
 </body>

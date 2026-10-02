@@ -1,0 +1,7 @@
+{
+  "aspect": 0.75,
+  "three_class": "three",
+  "aspect_share": 0.738,
+  "images_sampled": 2400,
+  "sizes_from": "testdummyvt/hagRIDv2_512px"
+}

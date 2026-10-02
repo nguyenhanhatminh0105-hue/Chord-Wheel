@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gesturenet"
+version = "0.1.0"
+description = "Hand-pose classifier for Chord-Wheel"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.26", "torch>=2.6", "onnx>=1.15", "onnxscript>=0.2", "onnxruntime>=1.17", "matplotlib>=3.8"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+track = ["trackio"]
+
+[tool.setuptools]
+packages = ["gesturenet"]
+
+[tool.setuptools.package-data]
+gesturenet = ["*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

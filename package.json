@@ -9,13 +9,16 @@
   },
   "scripts": {
     "start": "SET ELECTRON_RUN_AS_NODE= && electron .",
-    "test": "node --test"
+    "test": "node --test test/*.test.js",
+    "e2e": "node scripts/e2e-gestures.js"
   },
   "dependencies": {
     "@mediapipe/camera_utils": "^0.3.1675466862",
-    "@mediapipe/hands": "^0.4.1646424915"
+    "@mediapipe/hands": "^0.4.1646424915",
+    "onnxruntime-node": "^1.30.0"
   },
   "devDependencies": {
-    "electron": "^33.0.0"
+    "electron": "^33.0.0",
+    "playwright-core": "^1.63.0"
   }
 }
