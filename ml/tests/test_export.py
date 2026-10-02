@@ -17,6 +17,12 @@ def test_export_matches_pytorch(tmp_path):
     assert max_abs_diff(net, path, feats) < 1e-5
 
 
+def test_export_writes_nothing_to_stdout(tmp_path, capsys):
+    # The exporter's progress lines contain emoji that a redirected Windows stdout (cp1252) cannot encode.
+    export_onnx(GestureNet().eval(), tmp_path / "g.onnx")
+    assert capsys.readouterr().out == ""
+
+
 def test_onnx_io_names_and_dynamic_batch(tmp_path):
     path = tmp_path / "g.onnx"
     export_onnx(GestureNet().eval(), path)

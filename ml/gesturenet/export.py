@@ -29,10 +29,11 @@ def export_onnx(net: GestureNet, path: Path, opset: int = OPSET) -> None:
     wrapped = WithSoftmax(net.eval()).eval()
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     batch = torch.export.Dim("N", min=1)
-    # A batch of 2 in the example input keeps the exported batch dimension dynamic.
+    # A batch of 2 in the example input keeps the exported batch dimension dynamic. verbose=False
+    # silences progress lines whose emoji a redirected Windows stdout cannot encode.
     torch.onnx.export(wrapped, (torch.zeros(2, NUM_FEATURES),), str(path), dynamo=True,
                       opset_version=opset, input_names=["landmarks"], output_names=["probs"],
-                      dynamic_shapes={"x": {0: batch}}, external_data=False)
+                      dynamic_shapes={"x": {0: batch}}, external_data=False, verbose=False)
 
 
 def max_abs_diff(net: GestureNet, path: Path, feats: np.ndarray) -> float:
