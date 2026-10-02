@@ -57,10 +57,11 @@ each labelled frame is appended to `ml/data/recordings/<session>.jsonl`
 
 ## 2. Data
 
-**HaGRID** (HAnd Gesture Recognition Image Dataset) provides, for over
-500,000 photos of thousands of people, each hand's gesture label, its 21
-MediaPipe landmarks as `(x, y)` image-relative coordinates, which hand it is,
-and an anonymised person id. Only the annotations are needed (a 719 MB
+**HaGRID** (HAnd Gesture Recognition Image Dataset, v2) provides, for over a
+million photos of tens of thousands of people, each hand's gesture label, its
+21 MediaPipe landmarks as `(x, y)` image-relative coordinates, and an
+anonymised person id. It does not record image sizes, or whether a hand is
+left or right. Only the annotations are needed (a 719 MB
 download); no images are downloaded. HaGRID is licensed under CC BY-SA 4.0
 with project-specific terms; it is credited in the model card, and neither
 the data nor any derived dataset is committed.
@@ -72,9 +73,10 @@ mean normalised pose of each chosen class is plotted to confirm its shape, and
 the annotation field names are read from the downloaded files rather than
 assumed.
 
-**Split by person.** Train, validation and test sets are 80 %, 10 % and 10 %
-of person ids, so no person appears in two sets and the test score measures
-people the model has never seen.
+**Split by person.** HaGRID's official train, validation and test sets are
+already split by person id, so no person appears in two sets and the test
+score measures people the model has never seen. A test checks this on the
+downloaded annotations.
 
 **Webcam test set.** About ten minutes recorded in the app's recording mode,
 in two sessions on different days or lighting. Each JSON line holds
@@ -91,25 +93,27 @@ Every hand becomes 42 numbers by the same procedure in Python
 1. **Pixel-proportional coordinates.** Multiply each `x` by the image width
    and each `y` by the image height, so one unit means the same distance in
    both directions. (MediaPipe normalises `x` and `y` by different amounts on
-   a non-square image.) Where the image size is unknown, the coordinates are
-   used as they are, and training augmentation (section 4) covers the
-   difference.
-2. **Mirror left hands.** If the hand is a left hand, negate every `x`, so
-   all hands look like right hands. In the app "left" is MediaPipe's
-   handedness label; in HaGRID it is the annotated leading hand. Because
-   either source could follow a mirrored-camera convention, evaluation
-   reports left and right hands separately, and the mirror rule is flipped
-   for a source if its left hands score clearly worse.
-3. **Translate.** Subtract the wrist (landmark 0) from every point.
-4. **Rotate upright.** With `v` the middle-finger knuckle (landmark 9) and
+   a non-square image.) HaGRID records no image sizes, so for HaGRID every
+   `x` is multiplied by one dataset-wide aspect factor, estimated before
+   training as the factor that makes a hand's wrist-to-knuckle length,
+   relative to its knuckle span, the same whether the hand is upright or
+   turned sideways. Training augmentation (section 4) covers the remaining
+   variation.
+2. **Translate.** Subtract the wrist (landmark 0) from every point.
+3. **Rotate upright.** With `v` the middle-finger knuckle (landmark 9) and
    `s = |v|`, map every point `(x, y)` to
    `((-v.y·x + v.x·y) / s, (-v.x·x - v.y·y) / s)`. This turns `v` to point
    straight up (negative `y`, image convention).
-5. **Scale.** Divide every point by `s`, so the knuckle sits at `(0, -1)`.
-6. **Flatten** to `[x0, y0, x1, y1, …, x20, y20]`.
+4. **Scale.** Divide every point by `s`, so the knuckle sits at `(0, -1)`.
+5. **Flatten** to `[x0, y0, x1, y1, …, x20, y20]`.
 
 If `s < 1e-6` the frame is skipped (treated as `other`). Only `x` and `y` are
 used, because HaGRID has no `z`.
+
+There is no left/right mirroring: HaGRID does not say which hand is which,
+so training flips hands horizontally at random (section 4) and the model
+learns both. Mirroring a hand negates every `x` feature and leaves every `y`
+feature unchanged.
 
 ## 4. Model and training
 
@@ -118,7 +122,8 @@ used, because HaGRID has no `z`.
 - **Loss:** cross-entropy weighted by inverse class frequency.
 - **Optimiser:** AdamW, learning rate 1e-3, weight decay 1e-4, batch 512.
 - **Augmentation**, applied to raw coordinates before the feature transform:
-  rotation by ±15°, scale by ±10 %, independent horizontal and vertical
+  a horizontal flip with probability 0.5, rotation by ±15°, scale by ±10 %,
+  independent horizontal and vertical
   stretch by ±25 % (robustness to aspect ratio), and Gaussian noise per
   landmark with a standard deviation of 1 % of the wrist-to-knuckle distance
   `s`.
@@ -189,8 +194,8 @@ gestures are on), plus the toggle button and the per-hand labels.
 
 **Python (`pytest`):**
 - HaGRID parsing on a small fixture file in the real annotation format.
-- Feature invariance: translating, scaling, rotating or mirroring a hand
-  leaves its features unchanged.
+- Feature invariance: translating, scaling or rotating a hand leaves its
+  features unchanged; mirroring it negates every `x` feature.
 - The split never puts one person in two sets.
 - Training smoke test on synthetic data (loss decreases; runs in seconds).
 - ONNX parity with PyTorch.
