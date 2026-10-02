@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "SET ELECTRON_RUN_AS_NODE= && electron .",
-    "test": "echo \"No tests specified yet\" && exit 0"
+    "test": "node --test"
   },
   "dependencies": {
     "@mediapipe/camera_utils": "^0.3.1675466862",

@@ -1,6 +1,10 @@
 # Chord Wheel
 
+[![Tests](https://github.com/nguyenhanhatminh0105-hue/Chord-Wheel/actions/workflows/tests.yml/badge.svg)](https://github.com/nguyenhanhatminh0105-hue/Chord-Wheel/actions/workflows/tests.yml)
+
 An Electron desktop app that lets you explore and play chords interactively. Click the wheel to trigger notes, or enable the webcam and use hand gestures via MediaPipe to play hands-free.
+
+![Playing A minor: the note and quality wheels, with the chord spelled out above](docs/screenshot.png)
 
 ## Features
 
@@ -23,3 +27,11 @@ npm start
 Requires Node.js and a webcam (optional, for hand tracking).
 
 On Windows, `launch.vbs` (which calls `launch.bat`) offers a double-click, no-terminal way to start the app once the repo path inside `launch.bat` is updated to match your local checkout.
+
+## Tests
+
+The music theory (note names, scales, chord spelling and pitch) lives in `theory.js`, apart from the audio and drawing code in `renderer.js`, so it runs under plain Node:
+
+```bash
+npm test
+```

@@ -8,41 +8,9 @@ document.getElementById('close-btn').addEventListener('click', () => {
 });
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const NOTES_SHARP  = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-const NOTES_FLAT   = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
-const NOTES_SOLFEGE= ['Do','Di','Re','Ri','Mi','Fa','Fi','Sol','Si','La','Li','Ti'];
-
-const QUALITIES = ['maj','min','dim','aug','maj7','min7','dom7','sus2','sus4','m7b5'];
-
-// Semitone intervals for each quality (relative to root)
-const QUALITY_INTERVALS = {
-  maj:  [0, 4, 7],
-  min:  [0, 3, 7],
-  dim:  [0, 3, 6],
-  aug:  [0, 4, 8],
-  maj7: [0, 4, 7, 11],
-  min7: [0, 3, 7, 10],
-  dom7: [0, 4, 7, 10],
-  sus2: [0, 2, 7],
-  sus4: [0, 5, 7],
-  m7b5: [0, 3, 6, 10],
-};
-
-const SCALES = {
-  major:         [0,2,4,5,7,9,11],
-  minor:         [0,2,3,5,7,8,10],
-  pentatonic:    [0,2,4,7,9],
-  blues:         [0,3,5,6,7,10],
-  dorian:        [0,2,3,5,7,9,10],
-  phrygian:      [0,1,3,5,7,8,10],
-  lydian:        [0,2,4,6,7,9,11],
-  mixolydian:    [0,2,4,5,7,9,10],
-  harmonic_minor:[0,2,3,5,7,8,11],
-};
-
-// Base MIDI note numbers for C4 = 60
-function midiToFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
-const C4 = 60;
+// Notes, scales and chord spelling live in theory.js (unit-tested under Node).
+const theory = require('./theory');
+const { QUALITIES, midiToFreq } = theory;
 
 // ── State ────────────────────────────────────────────────────────────────────
 let selectedNote = -1;      // 0-11, -1 = none
@@ -107,9 +75,7 @@ let activeOscillators = [];
 function startChord(noteIdx, qualIdx) {
   stopChord(true);
   if (noteIdx < 0) return;
-  const intervals = QUALITY_INTERVALS[QUALITIES[qualIdx]];
-  const rootMidi = C4 + noteIdx;
-  const bassMidi = rootMidi - 12;
+  const { bass: bassMidi, tones } = theory.chordMidiNotes(noteIdx, QUALITIES[qualIdx]);
 
   const dest = getAudioDest();
   const chordGain = audioCtx.createGain();
@@ -132,10 +98,10 @@ function startChord(noteIdx, qualIdx) {
   oscs.push(bassOsc);
 
   // Chord tones
-  for (const interval of intervals) {
+  for (const midi of tones) {
     const osc = audioCtx.createOscillator();
     osc.type = waveType;
-    osc.frequency.value = midiToFreq(rootMidi + interval);
+    osc.frequency.value = midiToFreq(midi);
     osc.connect(chordGain);
     osc.start();
     oscs.push(osc);
@@ -233,15 +199,12 @@ function getQualAtPoint(x, y) {
 }
 
 function getScaleNotes() {
-  const intervals = SCALES[currentScale];
-  return intervals.map(i => (scaleRoot + i) % 12);
+  return theory.scaleNotes(currentScale, scaleRoot);
 }
 
 // ── Drawing ───────────────────────────────────────────────────────────────────
 function getNoteName(idx) {
-  if (labelMode === 'flat') return NOTES_FLAT[idx];
-  if (labelMode === 'solfege') return NOTES_SOLFEGE[idx];
-  return NOTES_SHARP[idx];
+  return theory.noteName(idx, labelMode);
 }
 
 function drawSegment(ctx, cx, cy, r0, r1, startAngle, endAngle, fillColor, strokeColor, glowing) {
@@ -389,23 +352,13 @@ function updateHUD() {
   const root = getNoteName(selectedNote);
   const qual = QUALITIES[selectedQuality];
   chordNameEl.textContent = `${root} ${qual}`;
-  qualLabelEl.textContent = qualFullName(qual);
+  qualLabelEl.textContent = theory.qualityFullName(qual);
 
-  const intervals = QUALITY_INTERVALS[qual];
-  const noteIndices = intervals.map(i => (selectedNote + i) % 12);
+  const noteIndices = theory.chordPitchClasses(selectedNote, qual);
   notePillsEl.innerHTML = noteIndices.map(ni => {
     const name = getNoteName(ni);
     return `<span class="note-pill active">${name}</span>`;
   }).join('');
-}
-
-function qualFullName(q) {
-  const map = {
-    maj:'Major', min:'Minor', dim:'Diminished', aug:'Augmented',
-    maj7:'Major 7th', min7:'Minor 7th', dom7:'Dominant 7th',
-    sus2:'Suspended 2nd', sus4:'Suspended 4th', m7b5:'Half-Diminished',
-  };
-  return map[q] || q;
 }
 
 // ── Ripples ───────────────────────────────────────────────────────────────────
