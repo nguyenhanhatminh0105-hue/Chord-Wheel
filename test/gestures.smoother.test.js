@@ -27,12 +27,34 @@ test('a single odd frame does not flip the pose', () => {
   assert.equal(s.pose, 'fist');
 });
 
-test('a new pose takes over once it holds the majority', () => {
+test('a new pose takes over a pose in effect with four of the last five frames', () => {
   const s = new PoseSmoother(CLASSES);
-  feed(s, ['fist', 'fist', 'fist', 'palm', 'palm']);
+  feed(s, ['fist', 'fist', 'fist', 'palm', 'palm', 'palm']);
   assert.equal(s.pose, 'fist');
   s.push(p('palm'));
   assert.equal(s.pose, 'palm');
+});
+
+test('a pose in effect survives a long run of alternating frames', () => {
+  const s = new PoseSmoother(CLASSES);
+  feed(s, ['fist', 'fist', 'fist']);
+  for (let i = 0; i < 12; i++) {
+    s.push(p(i % 2 ? 'fist' : 'palm'));
+    assert.equal(s.pose, 'fist', `frame ${i}`);
+  }
+});
+
+test('holding tells whether the hand shows a recognised pose right now', () => {
+  const s = new PoseSmoother(CLASSES);
+  assert.equal(s.holding, false);
+  feed(s, ['fist', 'fist', 'fist']);
+  assert.equal(s.holding, true);
+  feed(s, ['other', 'other', 'other']);
+  assert.equal(s.holding, false);
+  assert.equal(s.pose, 'fist');
+  feed(s, ['palm', 'palm', 'palm']);   // a challenger that leads but cannot take over yet
+  assert.equal(s.holding, true);
+  assert.equal(s.pose, 'fist');
 });
 
 test('other never changes the pose', () => {
@@ -41,7 +63,7 @@ test('other never changes the pose', () => {
   assert.equal(s.pose, 'fist');
 });
 
-test('tied or alternating frames change nothing', () => {
+test('tied frames establish no pose', () => {
   const s = new PoseSmoother(CLASSES);
   feed(s, ['fist', 'palm', 'fist', 'palm', 'other']);
   assert.equal(s.pose, null);
@@ -58,6 +80,7 @@ test('reset forgets the history and the pose', () => {
   feed(s, ['fist', 'fist', 'fist']);
   s.reset();
   assert.equal(s.pose, null);
+  assert.equal(s.holding, false);
   s.push(p('fist'));
   assert.equal(s.pose, null);
 });
