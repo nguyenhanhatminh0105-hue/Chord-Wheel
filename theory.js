@@ -1,6 +1,7 @@
 // ── theory.js ────────────────────────────────────────
 // Music theory behind the wheel: note names, scales, chord spelling and pitch.
 // Pure functions with no DOM or audio, so they run under Node for the tests.
+(function () {
 'use strict';
 
 const NOTES_SHARP  = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -71,7 +72,12 @@ function chordMidiNotes(rootIdx, quality) {
   return { bass: root - 12, tones: QUALITY_INTERVALS[quality].map(i => root + i) };
 }
 
-module.exports = {
+const api = {
   NOTES_SHARP, NOTES_FLAT, NOTES_SOLFEGE, QUALITIES, QUALITY_INTERVALS, SCALES, C4,
   midiToFreq, scaleNotes, noteName, qualityFullName, chordPitchClasses, chordMidiNotes,
 };
+
+// Node (the tests) gets a module; the page gets a global, in Electron and in a browser alike.
+if (typeof module !== 'undefined' && module.exports) module.exports = api;
+if (typeof window !== 'undefined') window.ChordTheory = api;
+})();
