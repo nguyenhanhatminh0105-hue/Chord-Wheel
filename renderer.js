@@ -1,16 +1,22 @@
 // ── renderer.js ──────────────────────────────────────────────────────────────
 'use strict';
 
-// Close button fix for frameless window
-const { ipcRenderer } = require('electron');
+// The same page runs as the Electron app and as a plain web page. Only the
+// window chrome and the way the hand-tracking model is loaded differ.
+const isElectron = typeof process === 'object' && !!(process.versions && process.versions.electron);
+document.body.classList.add(isElectron ? 'desktop' : 'web');
 document.getElementById('close-btn').addEventListener('click', () => {
   window.close();
 });
 
 // ── Constants ────────────────────────────────────────────────────────────────
 // Notes, scales and chord spelling live in theory.js (unit-tested under Node).
-const theory = require('./theory');
+const theory = window.ChordTheory;
 const { QUALITIES, midiToFreq } = theory;
+
+// Computer-keyboard layout: the home row is the white keys, the row above the black ones.
+const NOTE_KEYS = ['a', 'w', 's', 'e', 'd', 'f', 't', 'g', 'y', 'h', 'u', 'j'];
+const QUALITY_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 
 // ── State ────────────────────────────────────────────────────────────────────
 let selectedNote = -1;      // 0-11, -1 = none
@@ -147,19 +153,45 @@ function resize() {
   const main = document.getElementById('main');
   W = main.clientWidth;
   H = main.clientHeight;
-  [wheelCanvas, overlayCanvas, rippleCanvas].forEach(c => {
-    c.width = W; c.height = H;
+  // Draw at the screen's pixel density so the wheels stay sharp.
+  const ratio = Math.min(window.devicePixelRatio || 1, 2);
+  [[wheelCanvas, wCtx], [overlayCanvas, oCtx], [rippleCanvas, rCtx]].forEach(([c, ctx]) => {
+    c.width = Math.round(W * ratio); c.height = Math.round(H * ratio);
+    c.style.width = W + 'px'; c.style.height = H + 'px';
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
   });
+  placeHUD();
   drawWheels();
 }
 
 window.addEventListener('resize', resize);
 
 // ── Geometry helpers ─────────────────────────────────────────────────────────
-function noteWheelCenter()  { return { x: W * 0.22, y: H * 0.70 }; }
-function noteWheelRadius()  { return Math.min(W * 0.17, H * 0.26); }
-function qualWheelCenter()  { return { x: W * 0.78, y: H * 0.70 }; }
-function qualWheelRadius()  { return Math.min(W * 0.12, H * 0.18); }
+// Wide windows put a wheel under each hand with the chord readout between
+// them. Tall, narrow ones (a phone) stack the wheels instead.
+function isStacked() { return W < 720 && H > W; }
+function noteWheelCenter()  { return isStacked() ? { x: W * 0.5, y: H * 0.27 } : { x: W * 0.255, y: H * 0.52 }; }
+function noteWheelRadius()  { return isStacked() ? Math.min(W * 0.42, H * 0.22) : Math.min(W * 0.19, H * 0.40); }
+function qualWheelCenter()  { return isStacked() ? { x: W * 0.5, y: H * 0.81 } : { x: W * 0.775, y: H * 0.52 }; }
+function qualWheelRadius()  { return isStacked() ? Math.min(W * 0.31, H * 0.165) : Math.min(W * 0.145, H * 0.30); }
+
+// The readout sits in the gap the wheels leave.
+function placeHUD() {
+  const hud = document.getElementById('hud');
+  const n = noteWheelCenter(), nr = noteWheelRadius();
+  const q = qualWheelCenter(), qr = qualWheelRadius();
+  document.body.classList.toggle('stacked', isStacked());
+  if (isStacked()) {
+    hud.style.left = '50%';
+    hud.style.top = ((n.y + nr + q.y - qr - 26) / 2) + 'px';
+    hud.style.width = Math.min(W - 32, 320) + 'px';
+  } else {
+    const left = n.x + nr, right = q.x - qr;
+    hud.style.left = ((left + right) / 2) + 'px';
+    hud.style.top = '50%';
+    hud.style.width = Math.max(140, right - left - 32) + 'px';
+  }
+}
 const INNER_RATIO = 0.28; // inner button relative to wheel radius
 const SEGMENT_GAP = 0.022; // radians gap between segments
 
@@ -225,27 +257,48 @@ function drawSegment(ctx, cx, cy, r0, r1, startAngle, endAngle, fillColor, strok
   ctx.restore();
 }
 
-function drawText(ctx, text, cx, cy, r, angle, color, size) {
+// Labels are always upright, wherever they sit on the wheel.
+function drawText(ctx, text, cx, cy, r, angle, color, size, weight = 'bold') {
   ctx.save();
-  ctx.translate(cx + r * Math.cos(angle), cy + r * Math.sin(angle));
-  ctx.rotate(angle + Math.PI / 2);
   ctx.fillStyle = color;
-  ctx.font = `bold ${size}px 'Space Mono', monospace`;
+  ctx.font = `${weight} ${size}px 'Space Mono', monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, 0, 0);
+  ctx.fillText(text, cx + r * Math.cos(angle), cy + r * Math.sin(angle));
   ctx.restore();
+}
+
+function drawArc(ctx, cx, cy, r, startAngle, endAngle, color, width) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, startAngle + SEGMENT_GAP, endAngle - SEGMENT_GAP);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawWheelTitle(text, c, r) {
+  wCtx.save();
+  wCtx.fillStyle = '#8b90a8';
+  wCtx.font = `12px 'Space Mono', monospace`;
+  wCtx.textAlign = 'center';
+  wCtx.textBaseline = 'alphabetic';
+  wCtx.fillText(text, c.x, c.y - r - 14);
+  wCtx.restore();
 }
 
 function drawWheels() {
   wCtx.clearRect(0, 0, W, H);
-  wCtx.globalAlpha = 0.55;
+  // With the camera on, the wheels go translucent so your hands show through.
+  wCtx.globalAlpha = camEnabled ? 0.62 : 1;
 
   const nc = noteWheelCenter();
   const nr = noteWheelRadius();
   const qc = qualWheelCenter();
   const qr = qualWheelRadius();
   const scaleNotes = getScaleNotes();
+  const showKeys = !isStacked() && !camEnabled;
 
   // ── Note wheel ──
   const sa12 = segmentAngle(12);
@@ -255,47 +308,42 @@ function drawWheels() {
     const mid   = (start + end) / 2;
     const active = i === selectedNote && isPlaying;
     const inScale = scaleNotes.includes(i);
+    const isRoot = i === scaleRoot;
     const dimmed = snapEnabled && !inScale;
 
-    let fill = active
-      ? '#f97316'
-      : dimmed ? '#141420' : (inScale ? '#1e2a3a' : '#171727');
-    let stroke = active ? '#fbbf24' : dimmed ? '#222' : '#334';
-    const isBlack = [1,3,6,8,10].includes(i);
-    if (!active && !dimmed) fill = isBlack ? '#12121e' : '#1a1a2e';
-
+    const fill = active ? '#f97316' : dimmed ? '#101018' : inScale ? '#1d2233' : '#14141f';
+    const stroke = active ? '#fbbf24' : dimmed ? '#1a1a26' : inScale ? '#343b55' : '#23233a';
     drawSegment(wCtx, nc.x, nc.y, nr * INNER_RATIO + 4, nr, start, end, fill, stroke, active);
 
-    const textR = nr * 0.72;
-    const textColor = active ? '#fff' : dimmed ? '#333' : (inScale ? '#cbd5e1' : '#555');
-    const fontSize = nr * 0.1;
-    drawText(wCtx, getNoteName(i), nc.x, nc.y, textR, mid, textColor, Math.max(10, fontSize));
+    // Notes of the current scale carry an orange rim; the key note's is brighter.
+    if (inScale && !active) {
+      drawArc(wCtx, nc.x, nc.y, nr - 3, start, end, isRoot ? '#f97316' : '#f9731666', isRoot ? 4 : 3);
+    }
+
+    const textColor = active ? '#1a0d02' : dimmed ? '#3d4052' : inScale ? '#e8ebf4' : '#8b90a8';
+    drawText(wCtx, getNoteName(i), nc.x, nc.y, nr * 0.72, mid, textColor, Math.max(12, nr * 0.105));
+    if (showKeys && !dimmed) {
+      drawText(wCtx, NOTE_KEYS[i].toUpperCase(), nc.x, nc.y, nr * 0.46, mid, active ? '#4a2206' : '#5f647d', Math.max(10, nr * 0.055), 'normal');
+    }
   }
 
   // Inner OFF button
   wCtx.save();
-  const offActive = selectedNote === -1 && !isPlaying;
   wCtx.beginPath();
   wCtx.arc(nc.x, nc.y, nr * INNER_RATIO, 0, Math.PI * 2);
-  wCtx.fillStyle = offActive ? '#1e1e2e' : '#0d0d0f';
+  wCtx.fillStyle = isPlaying ? '#1a1a28' : '#0d0d0f';
   wCtx.fill();
-  wCtx.strokeStyle = '#333';
+  wCtx.strokeStyle = isPlaying ? '#4a4f6b' : '#2a2a40';
   wCtx.lineWidth = 1.5;
   wCtx.stroke();
-  wCtx.fillStyle = '#444';
-  wCtx.font = `bold ${nr * 0.08}px 'Space Mono', monospace`;
+  wCtx.fillStyle = isPlaying ? '#e8ebf4' : '#5f647d';
+  wCtx.font = `bold ${Math.max(11, nr * 0.075)}px 'Space Mono', monospace`;
   wCtx.textAlign = 'center';
   wCtx.textBaseline = 'middle';
   wCtx.fillText('OFF', nc.x, nc.y);
   wCtx.restore();
 
-  // Wheel label
-  wCtx.save();
-  wCtx.fillStyle = '#333';
-  wCtx.font = `10px 'Space Mono', monospace`;
-  wCtx.textAlign = 'center';
-  wCtx.fillText('NOTE', nc.x, nc.y + nr + 16);
-  wCtx.restore();
+  drawWheelTitle('Root note', nc, nr);
 
   // ── Quality wheel ──
   const saQ = segmentAngle(QUALITIES.length);
@@ -303,16 +351,18 @@ function drawWheels() {
     const start = -Math.PI / 2 + i * saQ - saQ / 2;
     const end   = start + saQ;
     const mid   = (start + end) / 2;
-    const active = i === selectedQuality && isPlaying;
+    const chosen = i === selectedQuality;
+    const active = chosen && isPlaying;
 
-    const fill = active ? '#a78bfa' : '#13132a';
-    const stroke = active ? '#c4b5fd' : '#2a2a4a';
+    const fill = active ? '#a78bfa' : chosen ? '#2a2452' : '#15142a';
+    const stroke = active ? '#c4b5fd' : chosen ? '#a78bfa' : '#29284a';
     drawSegment(wCtx, qc.x, qc.y, qr * INNER_RATIO + 3, qr, start, end, fill, stroke, active);
 
-    const textR = qr * 0.72;
-    const textColor = active ? '#fff' : '#6666aa';
-    const fontSize = Math.max(9, qr * 0.12);
-    drawText(wCtx, QUALITIES[i], qc.x, qc.y, textR, mid, textColor, fontSize);
+    const textColor = active ? '#140d2e' : chosen ? '#ede9fe' : '#a59bd6';
+    drawText(wCtx, QUALITIES[i], qc.x, qc.y, qr * 0.74, mid, textColor, Math.max(11, qr * 0.105));
+    if (showKeys) {
+      drawText(wCtx, QUALITY_KEYS[i], qc.x, qc.y, qr * 0.46, mid, active ? '#3b2d7a' : '#5c5890', Math.max(10, qr * 0.07), 'normal');
+    }
   }
 
   // Inner quality circle
@@ -321,18 +371,12 @@ function drawWheels() {
   wCtx.arc(qc.x, qc.y, qr * INNER_RATIO, 0, Math.PI * 2);
   wCtx.fillStyle = '#0d0d0f';
   wCtx.fill();
-  wCtx.strokeStyle = '#2a2a4a';
+  wCtx.strokeStyle = '#29284a';
   wCtx.lineWidth = 1.5;
   wCtx.stroke();
   wCtx.restore();
 
-  // Wheel label
-  wCtx.save();
-  wCtx.fillStyle = '#333';
-  wCtx.font = `10px 'Space Mono', monospace`;
-  wCtx.textAlign = 'center';
-  wCtx.fillText('QUALITY', qc.x, qc.y + qr + 16);
-  wCtx.restore();
+  drawWheelTitle('Chord quality', qc, qr);
   wCtx.globalAlpha = 1;
 }
 
@@ -342,8 +386,10 @@ function updateHUD() {
   const qualLabelEl   = document.getElementById('quality-label');
   const notePillsEl   = document.getElementById('note-pills');
 
-  if (!isPlaying || selectedNote < 0) {
-    chordNameEl.textContent = '—';
+  const idle = !isPlaying || selectedNote < 0;
+  document.getElementById('hud').classList.toggle('idle', idle);
+  if (idle) {
+    chordNameEl.textContent = '';
     qualLabelEl.textContent = '';
     notePillsEl.innerHTML = '';
     return;
@@ -516,6 +562,23 @@ wheelCanvas.addEventListener('touchend', e => {
 }, { passive: false });
 
 // ── Toolbar controls ──────────────────────────────────────────────────────────
+const keySelect = document.getElementById('key-select');
+function fillKeySelect() {
+  keySelect.innerHTML = '';
+  for (let i = 0; i < 12; i++) {
+    const option = document.createElement('option');
+    option.value = i;
+    option.textContent = getNoteName(i);
+    keySelect.appendChild(option);
+  }
+  keySelect.value = scaleRoot;
+}
+fillKeySelect();
+keySelect.addEventListener('change', e => {
+  scaleRoot = parseInt(e.target.value, 10);
+  drawWheels();
+});
+
 document.getElementById('scale-select').addEventListener('change', e => {
   currentScale = e.target.value;
   drawWheels();
@@ -523,9 +586,19 @@ document.getElementById('scale-select').addEventListener('change', e => {
 
 document.getElementById('label-select').addEventListener('change', e => {
   labelMode = e.target.value;
+  fillKeySelect();
   drawWheels();
   updateHUD();
 });
+
+function setPressed(id, on) {
+  document.getElementById(id).setAttribute('aria-pressed', String(on));
+}
+
+// A short message in the readout, for things the user needs to know about the camera.
+function setNotice(text) {
+  document.getElementById('notice').textContent = text;
+}
 
 document.getElementById('wave-select').addEventListener('change', e => {
   waveType = e.target.value;
@@ -546,13 +619,13 @@ document.getElementById('volume-slider').addEventListener('input', e => {
 
 document.getElementById('snap-btn').addEventListener('click', () => {
   snapEnabled = !snapEnabled;
-  document.getElementById('snap-btn').classList.toggle('active', snapEnabled);
+  setPressed('snap-btn', snapEnabled);
   drawWheels();
 });
 
 document.getElementById('reverb-btn').addEventListener('click', () => {
   reverbEnabled = !reverbEnabled;
-  document.getElementById('reverb-btn').classList.toggle('active-purple', reverbEnabled);
+  setPressed('reverb-btn', reverbEnabled);
 });
 
 // ── Webcam ────────────────────────────────────────────────────────────────────
@@ -561,26 +634,32 @@ let videoStream = null;
 
 document.getElementById('cam-btn').addEventListener('click', async () => {
   camEnabled = !camEnabled;
-  document.getElementById('cam-btn').classList.toggle('active', camEnabled);
+  setPressed('cam-btn', camEnabled);
 
   if (camEnabled) {
     try {
+      setNotice('Starting the camera…');
       videoStream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
       videoEl.srcObject = videoStream;
       videoEl.style.display = 'block';
-      initHandTracking();
+      drawWheels();
+      await initHandTracking();
     } catch (err) {
       console.error('Camera error:', err);
       camEnabled = false;
-      document.getElementById('cam-btn').classList.remove('active');
+      setPressed('cam-btn', false);
+      setNotice('The camera is not available. Check that this page is allowed to use it.');
+      drawWheels();
     }
   } else {
+    setNotice('');
     videoEl.style.display = 'none';
     if (videoStream) {
       videoStream.getTracks().forEach(t => t.stop());
       videoStream = null;
     }
     stopHandTracking();
+    drawWheels();
   }
 });
 
@@ -596,7 +675,37 @@ let smoothLeft  = null, smoothRight  = null;
 let graceLeft   = 0,   graceRight   = 0;
 let noHandsFrames = 0;       // consecutive frames with no hands (reinit watchdog)
 
+const MEDIAPIPE_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/';
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('Could not load ' + src));
+    document.head.appendChild(script);
+  });
+}
+
+const HANDS_OPTIONS = {
+  maxNumHands: 2,
+  modelComplexity: 1,       // full model — more robust to hand shape changes
+  minDetectionConfidence: 0.5,
+  minTrackingConfidence: 0.3,
+};
+
+// In a browser the model and its files come from the CDN.
+async function buildHandsInstanceWeb() {
+  if (!window.Hands) await loadScript(MEDIAPIPE_CDN + 'hands.js');
+  const h = new window.Hands({ locateFile: file => MEDIAPIPE_CDN + file });
+  h.setOptions(HANDS_OPTIONS);
+  h.onResults(onHandResults);
+  await h.initialize();
+  return h;
+}
+
 async function buildHandsInstance() {
+  if (!isElectron) return buildHandsInstanceWeb();
   const { Hands } = require('@mediapipe/hands');
   const nodePath = require('path');
   const nodeFs   = require('fs');
@@ -624,12 +733,7 @@ async function buildHandsInstance() {
   const savedNodeVer = process.versions.node;
   delete process.versions.node;
   const h = new Hands({ locateFile });
-  h.setOptions({
-    maxNumHands: 2,
-    modelComplexity: 1,       // full model — more robust to hand shape changes
-    minDetectionConfidence: 0.5,
-    minTrackingConfidence: 0.3,
-  });
+  h.setOptions(HANDS_OPTIONS);
   h.onResults(onHandResults);
   await h.initialize();
   process.versions.node = savedNodeVer;
@@ -638,7 +742,10 @@ async function buildHandsInstance() {
 
 async function initHandTracking() {
   try {
+    setNotice('Loading hand tracking…');
     handsInstance = await buildHandsInstance();
+    if (!camEnabled) { stopHandTracking(); return; } // switched off while loading
+    setNotice('Left hand picks the note, right hand picks the chord.');
 
     // rAF loop — sends each ready video frame to the model
     let active = true;
@@ -666,6 +773,7 @@ async function initHandTracking() {
 
   } catch (err) {
     console.error('MediaPipe init failed:', err && (err.message || String(err)));
+    setNotice('Hand tracking could not be loaded. Clicking and the keyboard still work.');
   }
 }
 
@@ -804,12 +912,46 @@ function onHandResults(results) {
   rightHandPos = smoothRight;
 }
 
+// ── Computer keyboard ─────────────────────────────────────────────────────────
+// Hold a note key to play; the number row changes the chord, even mid-note.
+let heldNoteKey = null;
+
+window.addEventListener('keydown', e => {
+  if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (['SELECT', 'INPUT', 'BUTTON', 'A'].includes(document.activeElement.tagName)) return;
+  const key = e.key.toLowerCase();
+  const ni = NOTE_KEYS.indexOf(key);
+  const qi = QUALITY_KEYS.indexOf(key);
+  if (ni >= 0) {
+    if (snapEnabled && !getScaleNotes().includes(ni)) return;
+    heldNoteKey = key;
+    const c = noteWheelCenter(), r = noteWheelRadius() * 0.72;
+    const angle = -Math.PI / 2 + ni * segmentAngle(12);
+    if (!(ni === selectedNote && isPlaying)) onNotePress(ni, c.x + r * Math.cos(angle), c.y + r * Math.sin(angle));
+  } else if (qi >= 0) {
+    const c = qualWheelCenter(), r = qualWheelRadius() * 0.74;
+    const angle = -Math.PI / 2 + qi * segmentAngle(QUALITIES.length);
+    onQualPress(qi, c.x + r * Math.cos(angle), c.y + r * Math.sin(angle));
+  }
+});
+
+window.addEventListener('keyup', e => {
+  if (e.key.toLowerCase() !== heldNoteKey) return;
+  heldNoteKey = null;
+  onRelease();
+});
+
+window.addEventListener('blur', () => {
+  if (heldNoteKey) { heldNoteKey = null; onRelease(); }
+});
+
 // ── Initial draw ──────────────────────────────────────────────────────────────
 // Defer first resize so flex layout is fully computed before we read clientWidth/Height
 window.addEventListener('load', () => {
   resize();
   updateHUD();
-  document.getElementById('reverb-btn').classList.toggle('active-purple', reverbEnabled);
 });
+// The labels are drawn on canvas, so repaint once the font has arrived.
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (W) drawWheels(); });
 // Fallback in case load already fired
 requestAnimationFrame(() => { if (W === 0) { resize(); updateHUD(); } });
